@@ -1,6 +1,10 @@
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+
+
 create type person_type as enum ('expert', 'client');
-create type chat_status as enum ('not_started', 'opened', 'closed');
-create type order_status as enum ('free', 'taken', 'finished');
+create type chat_status as enum ('opened', 'closed');
+create type order_status as enum ('free', 'taken', 'complete');
 
 create table ServicesGroup
 (
@@ -26,15 +30,15 @@ create table LatLons
     Lat float not null,
     Lon float not null,
 
-    check(Lat between 0 and 90),
-    check(Lon between 0 and 180),
+    check(Lat between -90 and 90),
+    check(Lon between -180 and 180),
     primary key (LatLonId)
 );
 
 create table Services
 (
     ServiceId serial not null,
-    Name varchar(20) not null,
+    Name varchar(50) not null,
     ServicesGroupId int not null,
 
     primary key (ServiceId),
@@ -46,11 +50,11 @@ create table Persons
 (
     PersonId serial not null,
     Name varchar(80) not null,
-    Raiting float not null,
+    Raiting float DEFAULT 0 not null,
     PersonType person_type not null,
 
     primary key (PersonId),
-    check(Raiting between 1 and 5)
+    check(Raiting between 1 and 5 or Raiting = 0)
 );
 
 create table Reviews
@@ -60,11 +64,13 @@ create table Reviews
     Raiting int not null,
     AuthorId int not null,
     RecipientId int not null,
+    CreationTime timestamptz not null default now(),
 
     primary key (ReviewId),
     foreign key (AuthorId) references Persons (PersonId),
     foreign key (RecipientId) references Persons (PersonId),
-    check(AuthorId <> RecipientId)
+    check(AuthorId <> RecipientId),
+    check(Raiting between 1 and 5)
 );
 
 create table Regions
@@ -83,10 +89,11 @@ create table Regions
 create table Orders
 (
     OrderId serial not null,
+    Text varchar(500) not null,
     ExpertRating float,
-    CreationDate date not null,
-    AcceptanceDate date not null,
-    CompletionDate date not null,
+    CreationTime timestamptz not null default now(),
+    AcceptanceTime timestamptz,
+    CompletionTime timestamptz,
     ClientId int not null,
     ServiceId int not null,
     OrderStatus order_status not null,
@@ -109,17 +116,16 @@ create table ExpertsOrders
 create table VideoCalls
 (
     VideocallId serial not null,
-    StartDate date not null,
-    EndDate date not null,
+    StartTime timestamptz not null,
+    EndTime timestamptz not null,
     PersonId1 int not null,
     PersonId2 int not null,
-    OrderId int not null,
 
     primary key (VideocallId),
     foreign key (PersonId1) references Persons (PersonId),
     foreign key (PersonId2) references Persons (PersonId),
-    foreign key (OrderId) references Orders (OrderId),
-    check(StartDate < EndDate)
+    check(StartTime < EndTime),
+    check(EndTime < now())
 );
 
 create table Chats
@@ -127,20 +133,18 @@ create table Chats
     ChatId serial not null,
     PersonId1 int not null,
     PersonId2 int not null,
-    OrderId int not null,
     ChatStatus chat_status not null,
 
     primary key (ChatId),
     foreign key (PersonId1) references Persons (PersonId),
-    foreign key (PersonId2) references Persons (PersonId),
-    foreign key (OrderId) references Orders (OrderId)
+    foreign key (PersonId2) references Persons (PersonId)
 );
 
 create table Messages
 (
     MessageId serial not null,
     Text varchar(200) not null,
-    SendingDate date,
+    SendingTime timestamptz default now(),
     ChatId int not null,
     SenderId int not null,
 
@@ -180,6 +184,116 @@ create table Files
     unique (Location)
 );
 
+-- Procedures
+create procedure CreateOrder(_text varchar(500), _clientId int, _serviceId int)
+AS $$ 
+BEGIN 
+    insert into Orders 
+    	(Text, ClientId, ServiceId, OrderStatus)
+	values 
+		(_text, _clientId, _serviceId, 'free');
+END 
+$$ LANGUAGE plpgsql;
+
+create procedure TakeOrder(_orderId int, _expertId int)
+AS $$ 
+BEGIN 
+    insert into ExpertsOrders 
+    	(OrderId, PersonId)
+	values 
+		(_orderId, _expertId);
+
+	update Orders
+	set AcceptanceTime = now(), OrderStatus = 'taken'
+	where OrderId = _orderId;
+END 
+$$ LANGUAGE plpgsql;
+
+create procedure GiveUpOrder(_orderId int)
+AS $$ 
+BEGIN 
+    delete from ExpertsOrders where OrderId = _orderId;
+
+	update Orders
+	set AcceptanceTime = null, OrderStatus = 'free'
+	where OrderId = _orderId;
+END 
+$$ LANGUAGE plpgsql;
+
+create procedure CompleteOrder(_orderId int)
+AS $$ 
+BEGIN 
+	update Orders
+	set AcceptanceTime = now(), OrderStatus = 'complete'
+	where OrderId = _orderId;
+END
+$$ LANGUAGE plpgsql;
+
+
+create procedure AddLatLonToOrder(_orderId int, _latLonId int)
+AS $$ 
+BEGIN 
+	insert into LatLonsOrders(OrderId, LatLonId)
+		values (_orderId, _latLonId);
+END
+$$ LANGUAGE plpgsql;
+
+create procedure AddRegionToOrder(_orderId int, _regionId int)
+AS $$ 
+BEGIN 
+	insert into RegionsOrders (OrderId, RegionId)
+		values (_orderId, _regionId);
+END
+$$ LANGUAGE plpgsql;
+
+
+create procedure AddExpertRatingToOrder(_orderId int, _expertRaiting int)
+AS $$ 
+BEGIN 
+	update Orders
+	set ExpertRating = _expertRaiting
+	where OrderId = _orderId;
+END
+$$ LANGUAGE plpgsql;
+
+create procedure CreateChat(_personId1 int, _personId2 int)
+AS $$ 
+BEGIN 
+    insert into Chats 
+    	(PersonId1, PersonId2, ChatStatus)
+	values 
+		(_personId1, _personId2, 'opened');
+END 
+$$ LANGUAGE plpgsql;
+
+create procedure CloseChat(_chatId int)
+AS $$ 
+BEGIN 
+    update Chats
+	set chat_status = 'closed'
+	where ChatId = _chatId;
+END 
+$$ LANGUAGE plpgsql;
+
+create procedure SendMessage(_text varchar(200), _senderId int, _chatId int)
+AS $$ 
+BEGIN
+	insert into Messages 
+		(text, SenderId, ChatId)
+	values 
+		(_text, _senderId, _chatId);
+END 
+$$ LANGUAGE plpgsql;
+
+create procedure CreateLatLon(_lat float, _lon float)
+AS $$ 
+BEGIN
+	insert into LatLons (Lat, Lon)
+		values (_lat, _lon);
+END 
+$$ LANGUAGE plpgsql;
+
+
 -- Foreign keys
 create index on Services using hash (ServicesGroupId);
 create index on Reviews using hash (AuthorId);
@@ -192,10 +306,8 @@ create index on ExpertsOrders using hash (OrderId);
 create index on ExpertsOrders using hash (PersonId);
 create index on VideoCalls using hash (PersonId1);
 create index on VideoCalls using hash (PersonId2);
-create index on VideoCalls using hash (OrderId);
 create index on Chats using hash (PersonId1);
 create index on Chats using hash (PersonId2);
-create index on Chats using hash (OrderId);
 create index on Messages using hash (ChatId);
 create index on Messages using hash (SenderId);
 create index on RegionsOrders using hash (OrderId);
