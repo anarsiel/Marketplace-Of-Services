@@ -1,11 +1,6 @@
-create table PersonTypes
-(
-    PersonTypeId serial not null,
-    Name varchar(20) not null,
-
-    primary key (PersonTypeId),
-    unique (Name)
-);
+create type person_type as enum ('expert', 'client');
+create type chat_status as enum ('not_started', 'opened', 'closed');
+create type order_status as enum ('free', 'taken', 'finished');
 
 create table ServicesGroup
 (
@@ -13,24 +8,6 @@ create table ServicesGroup
     Name varchar(50) not null,
 
     primary key (ServicesGroupId),
-    unique (Name)
-);
-
-create table ChatStatuses
-(
-    ChatStatusId serial not null,
-    Name varchar(20) not null,
-
-    primary key (ChatStatusId),
-    unique (Name)
-);
-
-create table OrderStatuses
-(
-    OrderStatusId serial not null,
-    Name varchar(20) not null,
-
-    primary key (OrderStatusId),
     unique (Name)
 );
 
@@ -70,10 +47,9 @@ create table Persons
     PersonId serial not null,
     Name varchar(80) not null,
     Raiting float not null,
-    PersonTypeId int not null,
+    PersonType person_type not null,
 
     primary key (PersonId),
-    foreign key (PersonTypeId) references PersonTypes (PersonTypeId),
     check(Raiting between 1 and 5)
 );
 
@@ -113,12 +89,11 @@ create table Orders
     CompletionDate date not null,
     ClientId int not null,
     ServiceId int not null,
-    OrderStatusId int not null,
+    OrderStatus order_status not null,
 
     primary key (OrderId),
     foreign key (ClientId) references Persons (PersonId),
-    foreign key (ServiceId) references Services (ServiceId),
-    foreign key (OrderStatusId) references OrderStatuses (OrderStatusId)
+    foreign key (ServiceId) references Services (ServiceId)
 );
 
 create table ExpertsOrders
@@ -153,13 +128,12 @@ create table Chats
     PersonId int not null,
     ClientId int not null,
     OrderId int not null,
-    ChatStatusId int not null,
+    ChatStatus chat_status not null,
 
     primary key (ChatId),
     foreign key (PersonId) references Persons (PersonId),
     -- foreign key (ClientId) references Orders (ClientId),
-    foreign key (OrderId) references Orders (OrderId),
-    foreign key (ChatStatusId) references ChatStatuses (ChatStatusId)
+    foreign key (OrderId) references Orders (OrderId)
 );
 
 create table Messages
@@ -208,21 +182,18 @@ create table Files
 
 -- Foreign keys
 create index on Services using hash (ServicesGroupId);
-create index on Persons using hash (PersonTypeId);
 create index on Reviews using hash (AuthorId);
 create index on Reviews using hash (RecipientId);
 create index on Regions using hash (LatLonId);
 create index on Regions using hash (CountryId);
 create index on Orders using hash (ClientId);
 create index on Orders using hash (ServiceId);
-create index on Orders using hash (OrderStatusId);
 create index on ExpertsOrders using hash (OrderId);
 create index on ExpertsOrders using hash (PersonId);
 create index on VideoCalls using hash (PersonId);
 create index on VideoCalls using hash (OrderId);
 create index on Chats using hash (PersonId);
 create index on Chats using hash (OrderId);
-create index on Chats using hash (ChatStatusId);
 create index on Messages using hash (ChatId);
 create index on Messages using hash (SenderId);
 create index on RegionsOrders using hash (OrderId);
@@ -232,10 +203,7 @@ create index on LatLonsOrders using hash (LatLonId);
 create index on Files using hash (OrderId);
 
 -- Names and Strings
-create unique index on PersonTypes using btree (Name);
 create unique index on ServicesGroup using btree (Name);
-create unique index on ChatStatuses using btree (Name);
-create unique index on OrderStatuses using btree (Name);
 create unique index on Countries using btree (Name);
 create unique index on Services using btree (Name);
 create index on Persons using btree (Name);
@@ -243,9 +211,9 @@ create index on Regions using btree (Name);
 create unique index on Files using btree (Location);
 
 -- Raiting queries
-create index on Persons using btree (Rating);
-create index on Reviews using btree (Rating);
-create index on Reviews using btree (Rating);
+create index on Persons using btree (Raiting);
+create index on Reviews using btree (Raiting);
+create index on Orders using btree (ExpertRating);
 
 ---- Table join
 create index on ExpertsOrders using btree (PersonId, OrderId);
