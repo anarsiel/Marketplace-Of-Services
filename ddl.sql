@@ -111,13 +111,13 @@ create table VideoCalls
     VideocallId serial not null,
     StartDate date not null,
     EndDate date not null,
-    PersonId int not null,
-    ClientId int not null,
+    PersonId1 int not null,
+    PersonId2 int not null,
     OrderId int not null,
 
     primary key (VideocallId),
-    foreign key (PersonId) references Persons (PersonId),
-    -- foreign key (ClientId) references Orders (ClientId),
+    foreign key (PersonId1) references Persons (PersonId),
+    foreign key (PersonId2) references Persons (PersonId),
     foreign key (OrderId) references Orders (OrderId),
     check(StartDate < EndDate)
 );
@@ -125,14 +125,14 @@ create table VideoCalls
 create table Chats
 (
     ChatId serial not null,
-    PersonId int not null,
-    ClientId int not null,
+    PersonId1 int not null,
+    PersonId2 int not null,
     OrderId int not null,
     ChatStatus chat_status not null,
 
     primary key (ChatId),
-    foreign key (PersonId) references Persons (PersonId),
-    -- foreign key (ClientId) references Orders (ClientId),
+    foreign key (PersonId1) references Persons (PersonId),
+    foreign key (PersonId2) references Persons (PersonId),
     foreign key (OrderId) references Orders (OrderId)
 );
 
@@ -190,9 +190,11 @@ create index on Orders using hash (ClientId);
 create index on Orders using hash (ServiceId);
 create index on ExpertsOrders using hash (OrderId);
 create index on ExpertsOrders using hash (PersonId);
-create index on VideoCalls using hash (PersonId);
+create index on VideoCalls using hash (PersonId1);
+create index on VideoCalls using hash (PersonId2);
 create index on VideoCalls using hash (OrderId);
-create index on Chats using hash (PersonId);
+create index on Chats using hash (PersonId1);
+create index on Chats using hash (PersonId2);
 create index on Chats using hash (OrderId);
 create index on Messages using hash (ChatId);
 create index on Messages using hash (SenderId);
