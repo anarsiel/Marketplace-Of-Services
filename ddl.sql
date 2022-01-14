@@ -256,6 +256,14 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
+create procedure CreateLatLon(_lat float, _lon float)
+AS $$ 
+BEGIN
+	insert into LatLons (Lat, Lon)
+		values (_lat, _lon);
+END 
+$$ LANGUAGE plpgsql;
+
 create procedure CreateChat(_personId1 int, _personId2 int)
 AS $$ 
 BEGIN 
@@ -285,14 +293,25 @@ BEGIN
 END 
 $$ LANGUAGE plpgsql;
 
-create procedure CreateLatLon(_lat float, _lon float)
-AS $$ 
-BEGIN
-	insert into LatLons (Lat, Lon)
-		values (_lat, _lon);
-END 
-$$ LANGUAGE plpgsql;
+create or replace function person_from_chat()
+returns trigger as
+$$
+begin
+    if new.ChatId in (select ChatId
+		from Chats
+		where PersonId1 = new.SenderId or PersonId2 = new.SenderId
+	) then return new;
+    end if;
+    raise exception 'Message sender does not belong to this chat';
+end
+$$
+language plpgsql;
 
+create trigger sendMessageTrigger
+  before insert
+  on Messages
+  for each row
+execute function person_from_chat();
 
 -- Foreign keys
 create index on Services using hash (ServicesGroupId);
