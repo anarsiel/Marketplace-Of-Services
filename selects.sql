@@ -1,69 +1,75 @@
--- Получение по id пользователя всех заказов, которые он взялся исполнять
+-- 1. getAllTaken 
 select OrderId
 from ExpertsOrders
 where PersonId = _PersonId;
 
--- Получение по id пользователя, всех созданных им заказов
+-- 2. getAllCreated 
 select OrderId
 from Orders
 where ClientId = _PersonId;
 
--- Получение по id региона, всех cвободных в нем заказов
+-- 3. getAllAvailable 
+select OrderId
+from Orders
+where (ExpertRating = null or _Raiting = 0 or _Raiting >= ExpertRating) and OrderStatus = 'free';
+
+-- 4. getAllInRegion
 select OrderId
 from Orders natural join RegionsOrder
 where RegionId = _RegionId and OrderStatus = 'free';
 
--- Получение по id пользователя, всех типов заказов, за которые он брался
+-- 5. getAllTakenTypes
 select distinct Name
 from ExpertsOrders natural join Orders natural join Services
 where PersonId = _PersonId;
 
--- Получение по id пользователя, статистики по всем оценкам о нем
+-- 6. getReviewStat
 select Raiting, count(ReviewId)
 from Reviews
 where RecipientId = _PersonId;
 group by
 	Raiting;
 
--- Получение статистики о колличестве заказов, по типу услуги
+-- 7. getOrderTypesStat
 select ServiceId, count(OrderId)
 from Orders
 group by
 	ServiceId;
 
--- Получение статистики о колличестве заказов, по региону
+-- 8. getRegionStat
 select RegionId, count(OrderId)
 from RegionsOrders
 group by
 	RegionId;
 
--- Получение файлов по номеру заказа
+-- 9. getFilesInOrder
 select RegionId, count(OrderId)
 from RegionsOrders
 group by
 	RegionId;
 
--- Получение по id пользователя, всех его переписок
+-- 10. getAllPersonChats
 select ChatId
 from Chats
 where PersonId1 = _PersonId or PersonId2 = _PersonId;
 
--- Получение по id чата, всех его сообщений
+-- 11. getAllChatMessages
 select MessageId
 from Messages
 where ChatId = _ChatId;
 
--- Получение по id пользователя, всех его видеозвонков
+-- 12. getPersonVideoCallsHistory
 select VideoCallId
 from Videocalls
 where PersonId1 = _PersonId or PersonId2 = _PersonId;
 
--- Получение по id пользователя, всех отзывов о нем
+-- 13. getAllPersonReviews
 select ReviewId
 from Reviews
 where RecipientId = _PersonId;
 
--- Получение по id пользователя, всех оценок в отзывах о нем
+
+-- 14. getAllPersonReviewsRatings
 select Raiting
 from Reviews
 where RecipientId = _PersonId;
