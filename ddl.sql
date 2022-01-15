@@ -1,7 +1,3 @@
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-
-
 create type person_type as enum ('expert', 'client');
 create type chat_status as enum ('opened', 'closed');
 create type order_status as enum ('free', 'taken', 'complete');
@@ -96,7 +92,7 @@ create table Orders
     CompletionTime timestamptz,
     ClientId int not null,
     ServiceId int not null,
-    OrderStatus order_status not null,
+    OrderStatus order_status not null default 'free',
 
     primary key (OrderId),
     foreign key (ClientId) references Persons (PersonId),
@@ -133,7 +129,7 @@ create table Chats
     ChatId serial not null,
     PersonId1 int not null,
     PersonId2 int not null,
-    ChatStatus chat_status not null,
+    ChatStatus chat_status not null default 'opened',
 
     primary key (ChatId),
     foreign key (PersonId1) references Persons (PersonId),
@@ -192,9 +188,9 @@ create procedure CreateOrder(_text varchar(500), _clientId int, _serviceId int)
 AS $$ 
 BEGIN 
     insert into Orders 
-    	(Text, ClientId, ServiceId, OrderStatus)
+    	(Text, ClientId, ServiceId)
 	values 
-		(_text, _clientId, _serviceId, 'free');
+		(_text, _clientId, _serviceId);
 END 
 $$ LANGUAGE plpgsql;
 
@@ -271,9 +267,9 @@ create procedure CreateChat(_personId1 int, _personId2 int)
 AS $$ 
 BEGIN 
     insert into Chats 
-    	(PersonId1, PersonId2, ChatStatus)
+    	(PersonId1, PersonId2)
 	values 
-		(_personId1, _personId2, 'opened');
+		(_personId1, _personId2);
 END 
 $$ LANGUAGE plpgsql;
 

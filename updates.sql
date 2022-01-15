@@ -47,6 +47,9 @@ call AddRegionToOrder(_orderId, _regionId);
 -- добавить в заказ геопозицию
 call AddLatLonToOrder(_orderId, _latLonId);
 
+-- добавить в заказ нижнюю границу рейтинга для исполнителя
+call AddExpertRatingToOrder(_orderId, _expertRaiting);
+
 -- Закрыть чат
 сall CloseChat(_chatId)
 
