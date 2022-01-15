@@ -25,24 +25,6 @@ values
 	(_PersonId1, _PersonId2, _StartTime, _EndTime);
 
 -- 
--- updates
--- 
-
--- 2.1 добавить регион в заказ
-call AddRegionToOrder(_orderId, _regionId);
-
-
--- 2.2 добавить в заказ геопозицию
-call AddLatLonToOrder(_orderId, _latLonId);
-
--- 2.3 добавить в заказ нижнюю границу рейтинга для исполнителя
-call AddExpertRatingToOrder(_orderId, _expertRaiting);
-
--- 2.4 Закрыть чат
-сall CloseChat(_chatId)
-
-
--- 
 -- deletes
 -- 
 
