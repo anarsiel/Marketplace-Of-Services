@@ -250,7 +250,7 @@ END
 $$ LANGUAGE plpgsql;
 
 
-create procedure AddExpertRatingToOrder(_orderId int, _expertRaiting int)
+create procedure AddExpertRatingToOrder(_orderId int, _expertRaiting float)
 AS $$ 
 BEGIN 
 	update Orders
