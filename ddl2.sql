@@ -164,15 +164,16 @@ create or replace function visit_time_valid()
 returns trigger as
 $$
 begin
-    if exists (select BeginDate, EndDate
-        from Piece natural join Exhibited natural join Exhibition
-        where id = new.PieceId 
+    if exists (select *
+        from Exhibited E1 inner join Exhibition E2
+        on E1.exhibitionId = E2.Id
+        where pieceid = new.PieceId 
             and BeginDate <= new.VisitDate
-            and new.VisitDate <= EndDate
+            and (EndDate is null or new.VisitDate <= EndDate)
     ) then return new;
     end if;
 
-    raise exception 'VisitDate must be in range for BeginDate to EndDate';
+    raise exception 'VisitDate must be in range from BeginDate to EndDate for at least one Exhibition';
 end
 $$
 language plpgsql;
