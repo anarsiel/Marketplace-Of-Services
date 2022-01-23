@@ -102,12 +102,8 @@ create table Review
     foreign key (PieceId) references Piece (id),
     foreign key (PersonId) references Person (id),
 
-    check (VisitDate < Now())
-
-    -- check(Raiting between 1 and 5) 
-    -- мб стоит ограничить рейтинг
-    -- мб стоит добавить в Piece поле Raiting float (чтобы не считать каждый раз)
-    -- математика - долго
+    check (VisitDate < Now()),
+    check(Raiting between 1 and 5)
 
     -- СЛОЖНО: добавить триггер on insert - проверить что в VisitDate Кусок был где-то выставлен.
     -- мб стоит просто заменит на CreationDate
@@ -136,3 +132,53 @@ create unique index on Person(id) include(Name);
 
 -- for joins
 create index on Exhibited using btree (PieceId, ExhibitionId);
+create index on Exhibited using btree (ExhibitionId, PieceId);
+
+
+-- Triggers (перенести в updates.sql)
+create or replace function piece_on_exhibition()
+returns trigger as
+$$
+begin
+    if (select CategoryId
+        from Piece
+        where id = new.PieceId
+    ) in (select CategoryId
+        from Exhibition
+        where id = new.ExhibitionId
+    ) then return new;
+    end if;
+
+    raise exception 'Piece category must be equal to Exhibition category';
+end
+$$
+language plpgsql;
+
+create trigger insert_exhibited
+  before insert
+  on Exhibited
+  for each row
+execute function piece_on_exhibition();
+
+create or replace function visit_time_valid()
+returns trigger as
+$$
+begin
+    if exists (select BeginDate, EndDate
+        from Piece natural join Exhibited natural join Exhibition
+        where id = new.PieceId 
+            and BeginDate <= new.VisitDate
+            and new.VisitDate <= EndDate
+    ) then return new;
+    end if;
+
+    raise exception 'VisitDate must be in range for BeginDate to EndDate';
+end
+$$
+language plpgsql;
+
+create trigger insert_review
+  before insert
+  on Review
+  for each row
+execute function visit_time_valid();
