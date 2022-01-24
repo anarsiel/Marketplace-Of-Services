@@ -198,7 +198,7 @@ begin
                 BeginDate <= new.BeginDate and (EndDate is null or new.BeginDate <= EndDate)
                 or (new.BeginDate <= BeginDate and (new.EndDate is null or BeginDate <= new.EndDate))
             )
-    ) then raise exception 'VisitDate must be in range from BeginDate to EndDate for at least one Exhibition Iteration';
+    ) then raise exception 'New Exhibition Iteration dates must not intersect with this Exhibitions other Iterations';
     end if;
 
     return new;
@@ -211,6 +211,4 @@ create trigger insert_iteration
   on Iteration
   for each row
 execute function no_date_intersections();
-
-
 
