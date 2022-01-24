@@ -5,7 +5,7 @@ CREATE SCHEMA public;
 create table City
 (
     id bigserial not null,
-    Name varchar(64) not null,
+    Name varchar(256) not null,
 
     primary key (id)
     -- unique (Name) 
@@ -14,8 +14,8 @@ create table City
 create table Museum
 (
     id bigserial not null,
-    Name varchar(64) not null,
-    Description varchar(1024),
+    Name varchar(256) not null,
+    Description text,
     CityId bigint not null,
 
     primary key (id),
@@ -26,8 +26,8 @@ create table Museum
 create table Category
 (
     id bigserial not null,
-    Name varchar(64) not null,
-    Description varchar(1024),
+    Name varchar(256) not null,
+    Description text,
 
     primary key (id),
     unique (Name) 
@@ -36,8 +36,8 @@ create table Category
 create table Piece
 (
     id bigserial not null,
-    Name varchar(64) not null,
-    Description varchar(1024),
+    Name varchar(256) not null,
+    Description text,
     MuseumId bigint not null,
     CategoryId bigint not null,
 
@@ -47,43 +47,51 @@ create table Piece
 );
 
 
--- добавить название выставки в PDM
 create table Exhibition
 (
     id bigserial not null,
-    Name varchar(64),
-    Description varchar(1024),
+    Name varchar(256),
+    Description text,
     MuseumId bigint not null,
     CategoryId bigint not null,
-    BeginDate date not null,
-    EndDate date,
-    -- мб надо сделать optional enddate (если выставка постоянная или временная но еще не закончилась или с неизвестными сроками)
+    -- BeginDate date not null,
+    -- EndDate date,
 
     primary key (id),
+    unique(Name, MuseumId),
     foreign key (MuseumId) references Museum (id),
-    foreign key (CategoryId) references Category (id),
-	
-	check(BeginDate <= EndDate)
+    foreign key (CategoryId) references Category (id)
 );
 
--- у тебя не может выходить два одинаковых FK (у тебя должно быть FK1 FK2 FK3 ... а не FK1 FK1 FK2 FK2)
+create table Iteration
+(
+    id bigserial not null,
+    exhibitionId bigint not null,
+    BeginDate date not null,
+    EndDate date,
+
+    primary key (id),
+    check(BeginDate <= EndDate)
+
+    -- написать триггер на проверку того что все итерации не пересекаются для каждой конрктеной выставки в музее
+);
+
 create table Exhibited
 (
     PieceId bigint not null,
-    ExhibitionId bigint not null,
+    IterationId bigint not null,
 
-    primary key (PieceId, ExhibitionId),
+    primary key (PieceId, IterationId),
     foreign key (PieceId) references Piece (id),
-    foreign key (ExhibitionId) references Exhibition (id)
- 	-- добавить триггер on insert
+    foreign key (IterationId) references Iteration (id)
+    -- добавить триггер on insert
 );
 
--- заменить тип id на bigint в PDM
 create table Person
 (
     id bigserial not null,
-    Name varchar(64) not null,
-    Bio varchar(1024),
+    Name varchar(256) not null,
+    Bio text,
     CityId bigint not null,
 
     primary key (id),
@@ -92,21 +100,18 @@ create table Person
 
 create table Review
 (
-    Text varchar(1024),
+    Text text,
     Raiting int not null,
     VisitDate date not null, -- мб стоит сделать оптионал
-    PieceId bigint not null,
-    PersonId bigint not null, -- опечатка в PDM
+    IterationId bigint not null,
+    PersonId bigint not null,
 
-    primary key (PieceId, PersonId),
-    foreign key (PieceId) references Piece (id),
+    primary key (IterationId, PersonId),
+    foreign key (IterationId) references Iteration (id),
     foreign key (PersonId) references Person (id),
 
     check (VisitDate < Now()),
     check(Raiting between 1 and 5)
-
-    -- СЛОЖНО: добавить триггер on insert - проверить что в VisitDate Кусок был где-то выставлен.
-    -- мб стоит просто заменит на CreationDate
 );
 
 -- INDEXES
@@ -118,9 +123,9 @@ create index on Piece using hash (CategoryId);
 create index on Exhibition using hash (MuseumId);
 create index on Exhibition using hash (CategoryId);
 create index on Exhibited using hash (PieceId);
-create index on Exhibited using hash (ExhibitionId);
+create index on Exhibited using hash (IterationId);
 create index on Person using hash (CityId);
-create index on Review using hash (PieceId);
+create index on Review using hash (IterationId);
 create index on Review using hash (PersonId);
 
 -- covering indexed for varchars and for joins
@@ -131,9 +136,8 @@ create unique index on Piece(id) include(Name);
 create unique index on Person(id) include(Name);
 
 -- for joins
-create index on Exhibited using btree (PieceId, ExhibitionId);
-create index on Exhibited using btree (ExhibitionId, PieceId);
-
+create index on Exhibited using btree (PieceId, IterationId);
+create index on Exhibited using btree (IterationId, PieceId);
 
 -- Triggers (перенести в updates.sql)
 create or replace function piece_on_exhibition()
@@ -145,7 +149,7 @@ begin
         where id = new.PieceId
     ) in (select CategoryId
         from Exhibition
-        where id = new.ExhibitionId
+        where id in (select ExhibitionId from Iteration where id = new.IterationId)
     ) then return new;
     end if;
 
@@ -165,15 +169,14 @@ returns trigger as
 $$
 begin
     if exists (select *
-        from Exhibited E1 inner join Exhibition E2
-        on E1.exhibitionId = E2.Id
-        where pieceid = new.PieceId 
+        from Iteration
+        where id = new.IterationId
             and BeginDate <= new.VisitDate
             and (EndDate is null or new.VisitDate <= EndDate)
     ) then return new;
     end if;
 
-    raise exception 'VisitDate must be in range from BeginDate to EndDate for at least one Exhibition';
+    raise exception 'VisitDate must be in range from BeginDate to EndDate for at least one Exhibition Iteration';
 end
 $$
 language plpgsql;
@@ -183,3 +186,31 @@ create trigger insert_review
   on Review
   for each row
 execute function visit_time_valid();
+
+create or replace function no_date_intersections()
+returns trigger as
+$$
+begin
+    if exists (select *
+        from Iteration
+        where ExhibitionId = new.ExhibitionId
+            and (
+                BeginDate <= new.BeginDate and (EndDate is null or new.BeginDate <= EndDate)
+                or (new.BeginDate <= BeginDate and (new.EndDate is null or BeginDate <= new.EndDate))
+            )
+    ) then raise exception 'VisitDate must be in range from BeginDate to EndDate for at least one Exhibition Iteration';
+    end if;
+
+    return new;
+end
+$$
+language plpgsql;
+
+create trigger insert_iteration
+  before insert
+  on Iteration
+  for each row
+execute function no_date_intersections();
+
+
+
